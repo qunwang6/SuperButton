@@ -19,9 +19,9 @@ volatile bool callbackConnected = false;
 volatile bool gapConnected = false;
 volatile bool gapSubscribed = false;
 
-class CodexBleKeyboard : public BleKeyboard {
+class SuperButtonBleKeyboard : public BleKeyboard {
 public:
-  CodexBleKeyboard(const std::string &deviceName, const std::string &deviceManufacturer, uint8_t batteryLevel)
+  SuperButtonBleKeyboard(const std::string &deviceName, const std::string &deviceManufacturer, uint8_t batteryLevel)
       : BleKeyboard(deviceName, deviceManufacturer, batteryLevel) {}
 
 protected:
@@ -39,15 +39,15 @@ protected:
   }
 };
 
-CodexBleKeyboard bleKeyboard("CodexBtn-S3", "ESP32-S3", 100);
+SuperButtonBleKeyboard bleKeyboard("SuperButton-S3", "ESP32-S3", 100);
 DNSServer dnsServer;
 WebServer webServer(80);
 
-const char *PREF_NAMESPACE = "codex-remote";
+const char *PREF_NAMESPACE = "super-button";
 const char *PREF_WIFI_ENABLED = "wifi_on";
 const char *PREF_WIFI_SSID = "wifi_ssid";
 const char *PREF_WIFI_PASSWORD = "wifi_pass";
-const char *WIFI_SETUP_AP_SSID = "CodexBtn-Setup";
+const char *WIFI_SETUP_AP_SSID = "SuperButton-Setup";
 const IPAddress WIFI_SETUP_IP(192, 168, 4, 1);
 const IPAddress WIFI_SETUP_GATEWAY(192, 168, 4, 1);
 const IPAddress WIFI_SETUP_SUBNET(255, 255, 255, 0);
@@ -60,7 +60,7 @@ const unsigned long FACE_DOWN_CHECK_MS = 200;
 const unsigned long AUTO_SCREEN_OFF_MS = 30000;
 const unsigned long MENU_LONG_PRESS_MS = 700;
 const unsigned long WIFI_CONNECT_TIMEOUT_MS = 10000;
-const int MENU_ITEM_COUNT = 4;
+const int MENU_ITEM_COUNT = 5;
 const int BATTERY_REDRAW_DELTA = 5;
 const uint8_t DISPLAY_BRIGHTNESS = 120;
 const float FACE_DOWN_Z_THRESHOLD = -0.75f;
@@ -411,14 +411,14 @@ String buildWifiSetupPage(const String &notice = "") {
   String page;
   page.reserve(6000);
   page += F("<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>");
-  page += F("<title>CodexBtn WiFi</title><style>");
+  page += F("<title>SuperButton WiFi</title><style>");
   page += F("body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;margin:24px;background:#f6f8fb;color:#17202a}");
   page += F("main{max-width:560px;margin:auto;background:white;border:1px solid #d8dee8;border-radius:8px;padding:20px}");
   page += F("h1{font-size:22px;margin:0 0 8px}label{display:block;margin:14px 0 6px;font-weight:600}");
   page += F("select,input,button{box-sizing:border-box;width:100%;font-size:16px;padding:10px;border-radius:6px;border:1px solid #b8c2d2}");
   page += F("button{margin-top:16px;background:#155eef;color:white;border-color:#155eef;font-weight:700}");
   page += F(".muted{color:#5b6675;font-size:14px}.notice{background:#eaf2ff;border:1px solid #b8d2ff;border-radius:6px;padding:10px;margin:12px 0}");
-  page += F("</style></head><body><main><h1>CodexBtn WiFi Setup</h1>");
+  page += F("</style></head><body><main><h1>SuperButton WiFi Setup</h1>");
   page += F("<p class='muted'>Connect this device to your local WiFi.</p><p class='muted'>Status: ");
   page += htmlEscape(wifiStatusText());
   page += F("</p>");
@@ -643,10 +643,11 @@ void drawMenu() {
   String setupLabel = wifiSetupActive ? "WiFi setup off" : "WiFi setup";
   int menuX = 18;
   M5.Display.setTextDatum(middle_left);
-  M5.Display.drawString(String(menuSelection == 0 ? "> " : "  ") + bleLabel, menuX, h / 2 - 27);
-  M5.Display.drawString(String(menuSelection == 1 ? "> " : "  ") + wifiPowerLabel, menuX, h / 2 - 9);
-  M5.Display.drawString(String(menuSelection == 2 ? "> " : "  ") + setupLabel, menuX, h / 2 + 9);
-  M5.Display.drawString(String(menuSelection == 3 ? "> " : "  ") + "Exit", menuX, h / 2 + 27);
+  M5.Display.drawString(String(menuSelection == 0 ? "> " : "  ") + bleLabel, menuX, h / 2 - 36);
+  M5.Display.drawString(String(menuSelection == 1 ? "> " : "  ") + wifiPowerLabel, menuX, h / 2 - 18);
+  M5.Display.drawString(String(menuSelection == 2 ? "> " : "  ") + setupLabel, menuX, h / 2);
+  M5.Display.drawString(String(menuSelection == 3 ? "> " : "  ") + "Power off", menuX, h / 2 + 18);
+  M5.Display.drawString(String(menuSelection == 4 ? "> " : "  ") + "Exit", menuX, h / 2 + 36);
   M5.Display.setTextDatum(middle_center);
   M5.Display.drawString("B: move  A: select", w / 2, h - 12);
 }
@@ -858,6 +859,14 @@ void closeMenu(const String &message) {
   messageHoldUntilMs = millis() + MESSAGE_HOLD_MS;
 }
 
+void powerOffDevice() {
+  uiMode = UI_STATUS;
+  drawStatus(isBleActuallyConnected(), "Power off");
+  delay(300);
+  M5.Display.sleep();
+  M5.Power.powerOff();
+}
+
 void handleMenu(bool moveClicked, bool selectClicked) {
   if (moveClicked) {
     noteActivity();
@@ -894,6 +903,11 @@ void handleMenu(bool moveClicked, bool selectClicked) {
     uiMode = UI_STATUS;
     drawStatus(isBleActuallyConnected(), wifiSetupActive ? "Setup stopping" : "Setup starting");
     closeMenu(toggleWifiSetupPortal());
+    return;
+  }
+
+  if (menuSelection == 3) {
+    powerOffDevice();
     return;
   }
 
